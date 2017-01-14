@@ -189,7 +189,12 @@ class Bot(LoggingClass):
         """
         if self.config.commands_group_abbrev:
             self.compute_group_abbrev()
-
+        
+        #Force the property to be recached
+        for command in self.commands:
+            if hasattr(command, '_compiled_regex'):
+                del command._compiled_regex
+            
         self.compute_command_matches_re()
 
     def compute_group_abbrev(self):
