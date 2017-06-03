@@ -95,7 +95,7 @@ class OpusFilePlayable(BasePlayable, AbstractOpus):
 
 
 class FFmpegInput(BaseInput, AbstractOpus):
-    def __init__(self, source='-', command='avconv', streaming=False, **kwargs):
+    def __init__(self, source='-', command='ffmpeg', streaming=False, **kwargs):
         super(FFmpegInput, self).__init__(**kwargs)
         if source:
             self.source = source
@@ -163,7 +163,7 @@ class YoutubeDLInput(FFmpegInput):
                 if self._url:
                     obj = ydl.extract_info(self._url, download=False, process=False)
                     if 'entries' in obj:
-                        self._ie_info = obj['entries'][0]
+                        self._ie_info = list(obj['entries'])[0]
                     else:
                         self._ie_info = obj
 
@@ -175,10 +175,10 @@ class YoutubeDLInput(FFmpegInput):
         return self.info
 
     @classmethod
-    def many(cls, url, *args, **kwargs):
+    def many(cls, url, random=True, *args, **kwargs):
         import youtube_dl
 
-        ydl = youtube_dl.YoutubeDL({'format': 'webm[abr>0]/bestaudio/best'})
+        ydl = youtube_dl.YoutubeDL({'format': 'webm[abr>0]/bestaudio/best', 'playlistrandom' : random})
         info = ydl.extract_info(url, download=False, process=False)
 
         if 'entries' not in info:
@@ -196,6 +196,7 @@ class YoutubeDLInput(FFmpegInput):
 class BufferedOpusEncoderPlayable(BasePlayable, OpusEncoder, AbstractOpus):
     def __init__(self, source, *args, **kwargs):
         self.source = source
+        self.info = source.info
         self.frames = Queue(kwargs.pop('queue_size', 4096))
 
         # Call the AbstractOpus constructor, as we need properties it sets
@@ -203,7 +204,7 @@ class BufferedOpusEncoderPlayable(BasePlayable, OpusEncoder, AbstractOpus):
 
         # Then call the OpusEncoder constructor, which requires some properties
         #  that AbstractOpus sets up
-        OpusEncoder.__init__(self, self.sampling_rate, self.channels)
+        OpusEncoder.__init__(self, self.sampling_rate, self.channels, library_path="C:/lib/libopus-0.x64.dll")
 
         # Spawn the encoder loop
         gevent.spawn(self._encoder_loop)
