@@ -201,11 +201,16 @@ class Bot(LoggingClass):
         groups = set(command.group for command in self.commands if command.group)
 
         for group in groups:
-            for i in range(1, len(group)):
-                if not group[:i] in six.itervalues(self.group_abbrev):
-                    self.group_abbrev[group] = group[:i]
-                    break
-                self.group_abbrev.update({k: k[:i+1] for k, v in six.iteritems(self.group_abbrev) if v == group[:i]})
+            grp = group
+            while grp:
+                # If the group already exists, means someone else thought they
+                #  could use it so we need yank it from them (and not use it)
+                if grp in list(six.itervalues(self.group_abbrev)):
+                    self.group_abbrev = {k: v for k, v in six.iteritems(self.group_abbrev) if v != grp}
+                else:
+                    self.group_abbrev[group] = grp
+
+                grp = grp[:-1]
 
     def compute_command_matches_re(self):
         """
