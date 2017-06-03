@@ -7,9 +7,9 @@ from disco.api.http import APIException
 from disco.util.snowflake import to_snowflake
 from disco.util.functional import cached_property
 from disco.types.base import (
-    SlottedModel, Field, ListField, AutoDictField, snowflake, text, binary, enum
+    SlottedModel, Field, ListField, AutoDictField, snowflake, text, enum, datetime
 )
-from disco.types.user import User, Presence
+from disco.types.user import User
 from disco.types.voice import VoiceState
 from disco.types.channel import Channel
 from disco.types.message import Emoji
@@ -22,6 +22,17 @@ VerificationLevel = Enum(
     MEDIUM=2,
     HIGH=3,
     EXTREME=4,
+)
+
+ExplicitContentFilterLevel = Enum(
+    NONE=0,
+    WITHOUT_ROLES=1,
+    ALL=2
+)
+
+DefaultMessageNotificationsLevel = Enum(
+    ALL_MESSAGES=0,
+    ONLY_MENTIONS=1,
 )
 
 
@@ -51,6 +62,12 @@ class GuildEmoji(Emoji):
 
     def __str__(self):
         return u'<:{}:{}>'.format(self.name, self.id)
+
+    def update(self, **kwargs):
+        return self.client.api.guilds_emojis_modify(self.guild_id, self.id, **kwargs)
+
+    def delete(self):
+        return self.client.api.guilds_emojis_delete(self.guild_id, self.id)
 
     @property
     def url(self):
@@ -103,7 +120,7 @@ class Role(SlottedModel):
 
     @property
     def mention(self):
-        return '<@{}>'.format(self.id)
+        return '<@&{}>'.format(self.id)
 
     @cached_property
     def guild(self):
@@ -141,7 +158,7 @@ class GuildMember(SlottedModel):
     nick = Field(text)
     mute = Field(bool)
     deaf = Field(bool)
-    joined_at = Field(str)
+    joined_at = Field(datetime)
     roles = ListField(snowflake)
 
     def __str__(self):
@@ -201,11 +218,14 @@ class GuildMember(SlottedModel):
         else:
             self.client.api.guilds_members_modify(self.guild.id, self.user.id, nick=nickname or '')
 
+    def modify(self, **kwargs):
+        self.client.api.guilds_members_modify(self.guild.id, self.user.id, **kwargs)
+
     def add_role(self, role):
         self.client.api.guilds_members_roles_add(self.guild.id, self.user.id, to_snowflake(role))
 
     def remove_role(self, role):
-        self.clients.api.guilds_members_roles_remove(self.guild.id, self.user.id, to_snowflake(role))
+        self.client.api.guilds_members_roles_remove(self.guild.id, self.user.id, to_snowflake(role))
 
     @cached_property
     def owner(self):
@@ -250,9 +270,9 @@ class Guild(SlottedModel, Permissible):
     name : str
         Guild's name.
     icon : str
-        Guild's icon (as PNG binary data).
+        Guild's icon hash
     splash : str
-        Guild's splash image (as PNG binary data).
+        Guild's splash image hash
     region : str
         Voice region.
     afk_timeout : int
@@ -281,12 +301,14 @@ class Guild(SlottedModel, Permissible):
     afk_channel_id = Field(snowflake)
     embed_channel_id = Field(snowflake)
     name = Field(text)
-    icon = Field(binary)
-    splash = Field(binary)
-    region = Field(str)
+    icon = Field(text)
+    splash = Field(text)
+    region = Field(text)
     afk_timeout = Field(int)
     embed_enabled = Field(bool)
     verification_level = Field(enum(VerificationLevel))
+    explicit_content_filter = Field(enum(ExplicitContentFilterLevel))
+    default_message_notifications = Field(enum(DefaultMessageNotificationsLevel))
     mfa_level = Field(int)
     features = ListField(str)
     members = AutoDictField(GuildMember, 'id')
@@ -295,7 +317,6 @@ class Guild(SlottedModel, Permissible):
     emojis = AutoDictField(GuildEmoji, 'id')
     voice_states = AutoDictField(VoiceState, 'session_id')
     member_count = Field(int)
-    presences = ListField(Presence)
 
     synced = Field(bool, default=False)
 
@@ -307,6 +328,10 @@ class Guild(SlottedModel, Permissible):
         self.attach(six.itervalues(self.roles), {'guild_id': self.id})
         self.attach(six.itervalues(self.emojis), {'guild_id': self.id})
         self.attach(six.itervalues(self.voice_states), {'guild_id': self.id})
+
+    @cached_property
+    def owner(self):
+        return self.members.get(self.owner_id)
 
     def get_permissions(self, member):
         """
@@ -326,7 +351,8 @@ class Guild(SlottedModel, Permissible):
 
         value = PermissionValue(self.roles.get(self.id).permissions)
 
-        for role in map(self.roles.get, member.roles):
+        # Iterate over all roles the user has (plus the @everyone role)
+        for role in map(self.roles.get, member.roles + [self.id]):
             value += role.permissions
 
         return value
@@ -415,3 +441,32 @@ class Guild(SlottedModel, Permissible):
 
     def create_channel(self, *args, **kwargs):
         return self.client.api.guilds_channels_create(self.id, *args, **kwargs)
+
+    def leave(self):
+        return self.client.api.users_me_guilds_delete(self.id)
+
+    def get_invites(self):
+        return self.client.api.guilds_invites_list(self.id)
+
+    def get_emojis(self):
+        return self.client.api.guilds_emojis_list(self.id)
+
+    def get_icon_url(self, fmt='webp', size=1024):
+        if not self.icon:
+            return ''
+
+        return 'https://cdn.discordapp.com/icons/{}/{}.{}?size={}'.format(self.id, self.icon, fmt, size)
+
+    def get_splash_url(self, fmt='webp', size=1024):
+        if not self.splash:
+            return ''
+
+        return 'https://cdn.discordapp.com/splashes/{}/{}.{}?size={}'.format(self.id, self.splash, fmt, size)
+
+    @property
+    def icon_url(self):
+        return self.get_icon_url()
+
+    @property
+    def splash_url(self):
+        return self.get_splash_url()

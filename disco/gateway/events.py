@@ -9,7 +9,7 @@ from disco.types.message import Message, MessageReactionEmoji
 from disco.types.voice import VoiceState
 from disco.types.guild import Guild, GuildMember, Role, GuildEmoji
 
-from disco.types.base import Model, ModelMeta, Field, ListField, AutoDictField, snowflake, lazy_datetime
+from disco.types.base import Model, ModelMeta, Field, ListField, AutoDictField, snowflake, datetime
 
 # Mapping of discords event name to our event classes
 EVENTS_MAP = {}
@@ -49,6 +49,8 @@ class GatewayEvent(six.with_metaclass(GatewayEventMeta, Model)):
         """
         Create this GatewayEvent class from data and the client.
         """
+        cls.raw_data = obj
+
         # If this event is wrapping a model, pull its fields
         if hasattr(cls, '_wraps_model'):
             alias, model = cls._wraps_model
@@ -62,9 +64,12 @@ class GatewayEvent(six.with_metaclass(GatewayEventMeta, Model)):
         return cls(obj, client)
 
     def __getattr__(self, name):
-        if hasattr(self, '_proxy'):
-            return getattr(getattr(self, self._proxy), name)
-        return object.__getattribute__(self, name)
+        try:
+            _proxy = object.__getattribute__(self, '_proxy')
+        except AttributeError:
+            return object.__getattribute__(self, name)
+
+        return getattr(getattr(self, _proxy), name)
 
 
 def debug(func=None, match=None):
@@ -151,6 +156,7 @@ class GuildCreate(GatewayEvent):
         and if None, this is a normal guild join event.
     """
     unavailable = Field(bool)
+    presences = ListField(Presence)
 
     @property
     def created(self):
@@ -244,7 +250,7 @@ class ChannelPinsUpdate(GatewayEvent):
         The time the last message was pinned.
     """
     channel_id = Field(snowflake)
-    last_pin_timestamp = Field(lazy_datetime)
+    last_pin_timestamp = Field(datetime)
 
 
 @proxy(User)
@@ -539,7 +545,7 @@ class TypingStart(GatewayEvent):
     """
     channel_id = Field(snowflake)
     user_id = Field(snowflake)
-    timestamp = Field(lazy_datetime)
+    timestamp = Field(datetime)
 
 
 @wraps_model(VoiceState, alias='state')
@@ -607,6 +613,14 @@ class MessageReactionAdd(GatewayEvent):
     user_id = Field(snowflake)
     emoji = Field(MessageReactionEmoji)
 
+    def delete(self):
+        self.client.api.channels_messages_reactions_delete(
+            self.channel_id,
+            self.message_id,
+            self.emoji.to_string() if self.emoji.id else self.emoji.name,
+            self.user_id
+        )
+
     @property
     def channel(self):
         return self.client.state.channels.get(self.channel_id)
@@ -658,3 +672,11 @@ class MessageReactionRemoveAll(GatewayEvent):
     """
     channel_id = Field(snowflake)
     message_id = Field(snowflake)
+
+    @property
+    def channel(self):
+        return self.client.state.channels.get(self.channel_id)
+
+    @property
+    def guild(self):
+        return self.channel.guild

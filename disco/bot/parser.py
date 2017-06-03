@@ -2,7 +2,6 @@ import re
 import six
 import copy
 
-
 # Regex which splits out argument parts
 PARTS_RE = re.compile('(\<|\[|\{)((?:\w+|\:|\||\.\.\.| (?:[0-9]+))+)(?:\>|\]|\})')
 

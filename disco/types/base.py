@@ -6,8 +6,9 @@ import functools
 from holster.enum import BaseEnumMeta, EnumAttr
 from datetime import datetime as real_datetime
 
-from disco.util.functional import CachedSlotProperty
+from disco.util.chains import Chainable
 from disco.util.hashmap import HashMap
+from disco.util.functional import CachedSlotProperty
 
 DATETIME_FORMATS = [
     '%Y-%m-%dT%H:%M:%S.%f',
@@ -25,6 +26,9 @@ class Unset(object):
     def __nonzero__(self):
         return False
 
+    def __bool__(self):
+        return False
+
 
 UNSET = Unset()
 
@@ -33,7 +37,7 @@ class ConversionError(Exception):
     def __init__(self, field, raw, e):
         super(ConversionError, self).__init__(
             'Failed to convert `{}` (`{}`) to {}: {}'.format(
-                str(raw)[:144], field.src_name, field.deserializer, e))
+                str(raw)[:144], field.src_name, field.true_type, e))
 
         if six.PY3:
             self.__cause__ = e
@@ -42,6 +46,7 @@ class ConversionError(Exception):
 class Field(object):
     def __init__(self, value_type, alias=None, default=None, create=True, ignore_dump=None, cast=None, **kwargs):
         # TODO: fix default bullshit
+        self.true_type = value_type
         self.src_name = alias
         self.dst_name = None
         self.ignore_dump = ignore_dump or []
@@ -114,7 +119,9 @@ class DictField(Field):
     default = HashMap
 
     def __init__(self, key_type, value_type=None, **kwargs):
-        super(DictField, self).__init__(None, **kwargs)
+        super(DictField, self).__init__({}, **kwargs)
+        self.true_key_type = key_type
+        self.true_value_type = value_type
         self.key_de = self.type_to_deserializer(key_type)
         self.value_de = self.type_to_deserializer(value_type or key_type)
 
@@ -146,7 +153,7 @@ class AutoDictField(Field):
     default = HashMap
 
     def __init__(self, value_type, key, **kwargs):
-        super(AutoDictField, self).__init__(None, **kwargs)
+        super(AutoDictField, self).__init__({}, **kwargs)
         self.value_de = self.type_to_deserializer(value_type)
         self.key = key
 
@@ -174,8 +181,7 @@ def enum(typ):
     return _f
 
 
-# TODO: make lazy
-def lazy_datetime(data):
+def datetime(data):
     if not data:
         return None
 
@@ -187,38 +193,20 @@ def lazy_datetime(data):
             return real_datetime.strptime(data.rsplit('+', 1)[0], fmt)
         except (ValueError, TypeError):
             continue
-    raise ValueError('Failed to conver `{}` to datetime'.format(data))
-
-
-def datetime(data):
-    if not data:
-        return None
-
-    for fmt in DATETIME_FORMATS:
-        try:
-            return real_datetime.strptime(data.rsplit('+', 1)[0], fmt)
-        except (ValueError, TypeError):
-            continue
 
     raise ValueError('Failed to conver `{}` to datetime'.format(data))
 
 
 def text(obj):
+    if obj is None:
+        return None
+
     if six.PY2:
         if isinstance(obj, str):
             return obj.decode('utf-8')
         return obj
     else:
         return str(obj)
-
-
-def binary(obj):
-    if six.PY2:
-        if isinstance(obj, str):
-            return obj.decode('utf-8')
-        return unicode(obj)
-    else:
-        return bytes(obj, 'utf-8')
 
 
 def with_equality(field):
@@ -274,15 +262,7 @@ class ModelMeta(type):
         return super(ModelMeta, mcs).__new__(mcs, name, parents, dct)
 
 
-class AsyncChainable(object):
-    __slots__ = []
-
-    def after(self, delay):
-        gevent.sleep(delay)
-        return self
-
-
-class Model(six.with_metaclass(ModelMeta, AsyncChainable)):
+class Model(six.with_metaclass(ModelMeta, Chainable)):
     __slots__ = ['client']
 
     def __init__(self, *args, **kwargs):
@@ -296,12 +276,23 @@ class Model(six.with_metaclass(ModelMeta, AsyncChainable)):
             obj = kwargs
 
         self.load(obj)
+        self.validate()
+
+    def after(self, delay):
+        gevent.sleep(delay)
+        return self
+
+    def validate(self):
+        pass
 
     @property
     def _fields(self):
         return self.__class__._fields
 
     def load(self, obj, consume=False, skip=None):
+        return self.load_into(self, obj, consume, skip)
+
+    def load_into(self, inst, obj, consume=False, skip=None):
         for name, field in six.iteritems(self._fields):
             should_skip = skip and name in skip
 
@@ -313,19 +304,22 @@ class Model(six.with_metaclass(ModelMeta, AsyncChainable)):
             # If the field is unset/none, and we have a default we need to set it
             if (raw in (None, UNSET) or should_skip) and field.has_default():
                 default = field.default() if callable(field.default) else field.default
-                setattr(self, field.dst_name, default)
+                setattr(inst, field.dst_name, default)
                 continue
 
             # Otherwise if the field is UNSET and has no default, skip conversion
             if raw is UNSET or should_skip:
-                setattr(self, field.dst_name, raw)
+                setattr(inst, field.dst_name, raw)
                 continue
 
             value = field.try_convert(raw, self.client)
-            setattr(self, field.dst_name, value)
+            setattr(inst, field.dst_name, value)
 
-    def update(self, other):
+    def update(self, other, ignored=None):
         for name in six.iterkeys(self._fields):
+            if ignored and name in ignored:
+                continue
+
             if hasattr(other, name) and not getattr(other, name) is UNSET:
                 setattr(self, name, getattr(other, name))
 

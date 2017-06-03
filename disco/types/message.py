@@ -1,5 +1,6 @@
 import re
 import six
+import warnings
 import functools
 import unicodedata
 
@@ -7,8 +8,9 @@ from holster.enum import Enum
 
 from disco.types.base import (
     SlottedModel, Field, ListField, AutoDictField, snowflake, text,
-    lazy_datetime, enum
+    datetime, enum
 )
+from disco.util.paginator import Paginator
 from disco.util.snowflake import to_snowflake
 from disco.util.functional import cached_property
 from disco.types.user import User
@@ -108,7 +110,7 @@ class MessageEmbed(SlottedModel):
     type = Field(str, default='rich')
     description = Field(text)
     url = Field(text)
-    timestamp = Field(lazy_datetime)
+    timestamp = Field(datetime)
     color = Field(int)
     footer = Field(MessageEmbedFooter)
     image = Field(MessageEmbedImage)
@@ -118,7 +120,7 @@ class MessageEmbed(SlottedModel):
     fields = ListField(MessageEmbedField)
 
     def set_footer(self, *args, **kwargs):
-        self.footer = MessageEmbedField(*args, **kwargs)
+        self.footer = MessageEmbedFooter(*args, **kwargs)
 
     def set_image(self, *args, **kwargs):
         self.image = MessageEmbedImage(*args, **kwargs)
@@ -210,8 +212,8 @@ class Message(SlottedModel):
     author = Field(User)
     content = Field(text)
     nonce = Field(snowflake)
-    timestamp = Field(lazy_datetime)
-    edited_timestamp = Field(lazy_datetime)
+    timestamp = Field(datetime)
+    edited_timestamp = Field(datetime)
     tts = Field(bool)
     mention_everyone = Field(bool)
     pinned = Field(bool)
@@ -299,9 +301,44 @@ class Message(SlottedModel):
         """
         return self.client.api.channels_messages_delete(self.channel_id, self.id)
 
-    def create_reaction(self, emoji):
+    def get_reactors(self, emoji, *args, **kwargs):
+        """
+        Returns an iterator which paginates the reactors for the given emoji.
+
+        Returns
+        -------
+        Paginator(`User`)
+            An iterator which handles pagination of reactors.
+        """
         if isinstance(emoji, Emoji):
             emoji = emoji.to_string()
+
+        return Paginator(
+            self.client.api.channels_messages_reactions_get,
+            self.channel_id,
+            self.id,
+            emoji,
+            *args,
+            **kwargs)
+
+    def create_reaction(self, emoji):
+        warnings.warn(
+            'Message.create_reaction will be deprecated soon, use Message.add_reaction',
+            DeprecationWarning)
+        return self.add_reaction(emoji)
+
+    def add_reaction(self, emoji):
+        """
+        Adds a reaction to the message.
+
+        Parameters
+        ----------
+        emoji : Emoji|str
+            An emoji or string representing an emoji
+        """
+        if isinstance(emoji, Emoji):
+            emoji = emoji.to_string()
+
         self.client.api.channels_messages_reactions_create(
             self.channel_id,
             self.id,

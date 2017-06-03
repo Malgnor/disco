@@ -22,8 +22,9 @@ HTTPMethod = Enum(
 
 
 def to_bytes(obj):
-    if isinstance(obj, six.text_type):
-        return obj.encode('utf-8')
+    if six.PY2:
+        if isinstance(obj, six.text_type):
+            return obj.encode('utf-8')
     return obj
 
 
@@ -108,7 +109,7 @@ class Routes(object):
     USERS_ME_GET = (HTTPMethod.GET, USERS + '/@me')
     USERS_ME_PATCH = (HTTPMethod.PATCH, USERS + '/@me')
     USERS_ME_GUILDS_LIST = (HTTPMethod.GET, USERS + '/@me/guilds')
-    USERS_ME_GUILDS_LEAVE = (HTTPMethod.DELETE, USERS + '/@me/guilds/{guild}')
+    USERS_ME_GUILDS_DELETE = (HTTPMethod.DELETE, USERS + '/@me/guilds/{guild}')
     USERS_ME_DMS_LIST = (HTTPMethod.GET, USERS + '/@me/channels')
     USERS_ME_DMS_CREATE = (HTTPMethod.POST, USERS + '/@me/channels')
     USERS_ME_CONNECTIONS_LIST = (HTTPMethod.GET, USERS + '/@me/connections')
@@ -147,6 +148,7 @@ class APIException(Exception):
 
         self.code = 0
         self.msg = 'Request Failed ({})'.format(response.status_code)
+        self.errors = {}
 
         if self.retries:
             self.msg += " after {} retries".format(self.retries)
@@ -157,7 +159,8 @@ class APIException(Exception):
 
             if 'code' in data:
                 self.code = data['code']
-                self.msg = data['message']
+                self.errors = data.get('errors', {})
+                self.msg = '{} ({} - {})'.format(data['message'], self.code, self.errors)
             elif len(data) == 1:
                 key, value = list(data.items())[0]
                 self.msg = 'Request Failed: {}: {}'.format(key, ', '.join(value))
@@ -176,7 +179,7 @@ class HTTPClient(LoggingClass):
     A simple HTTP client which wraps the requests library, adding support for
     Discords rate-limit headers, authorization, and request/response validation.
     """
-    BASE_URL = 'https://discordapp.com/api/v6'
+    BASE_URL = 'https://discordapp.com/api/v7'
     MAX_RETRIES = 5
 
     def __init__(self, token):
@@ -189,12 +192,14 @@ class HTTPClient(LoggingClass):
 
         self.limiter = RateLimiter()
         self.headers = {
-            'Authorization': 'Bot ' + token,
             'User-Agent': 'DiscordBot (https://github.com/b1naryth1ef/disco {}) Python/{} requests/{}'.format(
                 disco_version,
                 py_version,
                 requests_version),
         }
+
+        if token:
+            self.headers['Authorization'] = 'Bot ' + token
 
     def __call__(self, route, args=None, **kwargs):
         return self.call(route, args, **kwargs)

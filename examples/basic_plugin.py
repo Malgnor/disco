@@ -12,7 +12,7 @@ class BasicPlugin(Plugin):
         self.log.info('Message created: {}: {}'.format(msg.author, msg.content))
 
     @Plugin.command('echo', '<content:str...>')
-    def on_test_command(self, event, content):
+    def on_echo_command(self, event, content):
         event.msg.reply(content)
 
     @Plugin.command('spam', '<count:int> <content:str...>')
@@ -50,7 +50,7 @@ class BasicPlugin(Plugin):
         if not users:
             event.msg.reply("Couldn't find user for your query: `{}`".format(query))
         elif len(users) > 1:
-            event.msg.reply('I found too many userse ({}) for your query: `{}`'.format(len(users), query))
+            event.msg.reply('I found too many users ({}) for your query: `{}`'.format(len(users), query))
         else:
             user = users[0]
             parts = []
@@ -66,3 +66,11 @@ class BasicPlugin(Plugin):
             event.msg.reply('```\n{}\n```'.format(
                 '\n'.join(parts)
             ))
+
+    @Plugin.command('test', parser=True)
+    @Plugin.parser.add_argument('-a', '--asdf', help='wow')
+    @Plugin.parser.add_argument('--help', action='store_true')
+    def on_test(self, event, args):
+        if args.help:
+            return event.msg.reply(event.parser.format_help())
+        event.msg.reply(args.asdf)
