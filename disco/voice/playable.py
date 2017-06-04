@@ -175,10 +175,10 @@ class YoutubeDLInput(FFmpegInput):
         return self.info
 
     @classmethod
-    def many(cls, url, random=True, *args, **kwargs):
+    def many(cls, url, *args, **kwargs):
         import youtube_dl
 
-        ydl = youtube_dl.YoutubeDL({'format': 'webm[abr>0]/bestaudio/best', 'playlistrandom' : random})
+        ydl = youtube_dl.YoutubeDL({'format': 'webm[abr>0]/bestaudio/best'})
         info = ydl.extract_info(url, download=False, process=False)
 
         if 'entries' not in info:
