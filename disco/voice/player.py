@@ -16,6 +16,7 @@ class Player(object):
         'STOP_PLAY',
         'PAUSE_PLAY',
         'RESUME_PLAY',
+        'EMPTY_QUEUE',
         'DISCONNECT'
     )
 
@@ -118,6 +119,9 @@ class Player(object):
             self.play_task.join()
             self.events.emit(self.Events.STOP_PLAY, self.now_playing)
             self.now_playing = None
+
+            if self.queue.empty():
+                self.events.emit(self.Events.EMPTY_QUEUE)
 
             if self.client.state == VoiceState.DISCONNECTED:
                 self.playing = False
