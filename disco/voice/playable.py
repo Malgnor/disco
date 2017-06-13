@@ -1,4 +1,5 @@
 import abc
+import array
 import six
 import types
 import gevent
@@ -158,7 +159,7 @@ class YoutubeDLInput(FFmpegInput):
         with self._info_lock:
             if not self._info:
                 import youtube_dl
-                ydl = youtube_dl.YoutubeDL({'format': 'webm[abr>0]/bestaudio/best'})
+                ydl = youtube_dl.YoutubeDL({'format': 'webm[abr>0]/bestaudio/best/worstaudio/worst', 'verbose': True})
 
                 if self._url:
                     obj = ydl.extract_info(self._url, download=False, process=False)
@@ -178,7 +179,7 @@ class YoutubeDLInput(FFmpegInput):
     def many(cls, url, *args, **kwargs):
         import youtube_dl
 
-        ydl = youtube_dl.YoutubeDL({'format': 'webm[abr>0]/bestaudio/best'})
+        ydl = youtube_dl.YoutubeDL({'format': 'webm[abr>0]/bestaudio/best/worstaudio/worst', 'verbose': True})
         info = ydl.extract_info(url, download=False, process=False)
 
         if 'entries' not in info:
@@ -222,6 +223,37 @@ class BufferedOpusEncoderPlayable(BasePlayable, OpusEncoder, AbstractOpus):
 
     def next_frame(self):
         return self.frames.get()
+
+
+class UnbufferedOpusEncoderPlayable(BasePlayable, OpusEncoder, AbstractOpus):
+    def __init__(self, source, *args, **kwargs):
+        self.source = source
+        self.info = source.info
+        self.volume = 1.0
+        self.frames = Queue(kwargs.pop('queue_size', 4096))
+
+        # Call the AbstractOpus constructor, as we need properties it sets
+        AbstractOpus.__init__(self, *args, **kwargs)
+
+        # Then call the OpusEncoder constructor, which requires some properties
+        #  that AbstractOpus sets up
+        OpusEncoder.__init__(self, self.sampling_rate, self.channels, library_path="C:/lib/libopus-0.x64.dll")
+
+    def next_frame(self):
+        if self.source:
+            raw = self.source.read(self.frame_size)
+            if len(raw) < self.frame_size:
+                return None
+
+            if self.volume == 1.0:
+                return self.encode(raw, self.samples_per_frame)
+
+            buffer = array.array('h', raw)
+            for pos, byte in enumerate(buffer):
+                buffer[pos] = int(min(32767, max(-32767, byte*self.volume)))
+            return self.encode(buffer.tobytes(), self.samples_per_frame)
+        self.source = None
+        return None
 
 
 class DCADOpusEncoderPlayable(BasePlayable, AbstractOpus, OpusEncoder):
