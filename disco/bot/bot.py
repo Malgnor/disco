@@ -1,11 +1,13 @@
 import re
 import os
 import six
+import gevent
 import inspect
 import importlib
 
 from six.moves import reload_module
 from holster.threadlocal import ThreadLocal
+from gevent.wsgi import WSGIServer
 
 from disco.types.guild import GuildMember
 from disco.bot.plugin import Plugin
@@ -63,6 +65,13 @@ class BotConfig(Config):
         The serialization format plugin configuration files are in.
     plugin_config_dir : str
         The directory plugin configuration is located within.
+    http_enabled : bool
+        Whether to enable the built-in Flask server which allows plugins to handle
+        and route HTTP requests.
+    http_host : str
+        The host string for the HTTP Flask server (if enabled)
+    http_port : int
+        The port for the HTTP Flask server (if enabled)
     """
     levels = {}
     plugins = []
@@ -89,6 +98,10 @@ class BotConfig(Config):
     storage_fsync = True
     storage_serializer = 'json'
     storage_path = 'storage.json'
+
+    http_enabled = False
+    http_host = '0.0.0.0'
+    http_port = 7575
 
 
 class Bot(LoggingClass):
@@ -131,6 +144,13 @@ class Bot(LoggingClass):
         # If the manhole is enabled, add this bot as a local
         if self.client.config.manhole_enable:
             self.client.manhole_locals['bot'] = self
+
+        if self.config.http_enabled:
+            from flask import Flask
+            self.log.info('Starting HTTP server bound to %s:%s', self.config.http_host, self.config.http_port)
+            self.http = Flask('disco')
+            self.http_server = WSGIServer((self.config.http_host, self.config.http_port), self.http)
+            self.http_server_greenlet = gevent.spawn(self.http_server.serve_forever)
 
         self.plugins = {}
         self.group_abbrev = {}
@@ -275,7 +295,7 @@ class Bot(LoggingClass):
                 mention_rules.get('role', False) and any(mention_roles),
                 msg.channel.is_dm
             )):
-                return
+                return []
 
             if mention_direct:
                 if msg.guild:
@@ -296,17 +316,19 @@ class Bot(LoggingClass):
             content = content.lstrip()
 
         if prefix and not content.startswith(prefix):
-            return
+            return []
         else:
             content = content[len(prefix):]
 
         if not self.command_matches_re or not self.command_matches_re.match(content):
-            return
+            return []
 
+        options = []
         for command in self.commands:
             match = command.compiled_regex.match(content)
             if match:
-                yield (command, match)
+                options.append((command, match))
+        return sorted(options, key=lambda obj: obj[0].group is None)
 
     def get_level(self, actor):
         level = CommandLevels.DEFAULT
@@ -359,14 +381,13 @@ class Bot(LoggingClass):
         if not len(commands):
             return False
 
-        result = False
         for command, match in commands:
             if not self.check_command_permissions(command, msg):
                 continue
 
             if command.plugin.execute(CommandEvent(command, msg, match)):
-                result = True
-        return result
+                return True
+        return False
 
     def on_message_create(self, event):
         if event.message.author.id == self.client.state.me.id:

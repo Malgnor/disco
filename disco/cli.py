@@ -14,7 +14,7 @@ from gevent import monkey
 monkey.patch_all()
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--config', help='Configuration file', default='config.yaml')
+parser.add_argument('--config', help='Configuration file', default='config.json')
 parser.add_argument('--token', help='Bot Authentication Token', default=None)
 parser.add_argument('--shard-count', help='Total number of shards', default=None)
 parser.add_argument('--shard-id', help='Current shard number/id', default=None)
@@ -25,6 +25,7 @@ parser.add_argument('--encoder', help='encoder for gateway data', default=None)
 parser.add_argument('--run-bot', help='run a disco bot on this client', action='store_true', default=False)
 parser.add_argument('--plugin', help='load plugins into the bot', nargs='*', default=[])
 parser.add_argument('--log-level', help='log level', default='info')
+parser.add_argument('--http-bind', help='bind information for http server', default=None)
 
 
 def disco_main(run=False):
@@ -48,6 +49,10 @@ def disco_main(run=False):
         config = ClientConfig.from_file(args.config)
     else:
         config = ClientConfig()
+
+    config.manhole_enable = args.manhole
+    if args.manhole_bind:
+        config.manhole_bind = args.manhole_bind
 
     for k, v in six.iteritems(vars(args)):
         if hasattr(config, k) and v is not None:
@@ -74,12 +79,20 @@ def disco_main(run=False):
             bot_config.plugins = args.plugin
         else:
             bot_config.plugins += args.plugin
+
+        if args.http_bind:
+            bot_config.http_enabled = True
+            host, port = args.http_bind.split(':', 1)
+            bot_config.http_host = host
+            bot_config.http_port = int(port)
+
         bot = Bot(client, bot_config)
 
     if run:
         (bot or client).run_forever()
 
     return (bot or client)
+
 
 if __name__ == '__main__':
     disco_main(True)

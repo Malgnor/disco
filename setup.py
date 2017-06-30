@@ -3,13 +3,6 @@ from setuptools import setup, find_packages
 from disco import VERSION
 
 
-def run_tests():
-    import unittest
-    test_loader = unittest.TestLoader()
-    test_suite = test_loader.discover('tests', pattern='test_*.py')
-    return test_suite
-
-
 with open('requirements.txt') as f:
     requirements = f.readlines()
 
@@ -18,6 +11,8 @@ with open('README.md') as f:
 
 extras_require = {
     'voice': ['pynacl==1.1.2'],
+    'http': ['flask==0.12.2'],
+    'yaml': ['pyyaml==3.12'],
     'music': ['youtube_dl==2017.4.26'],
     'performance': ['erlpack==0.3.2', 'ujson==1.35'],
     'sharding': ['gipc==0.6.0'],
@@ -36,7 +31,7 @@ setup(
     include_package_data=True,
     install_requires=requirements,
     extras_require=extras_require,
-    test_suite='setup.run_tests',
+    test_suite='tests',
     classifiers=[
         'Development Status :: 4 - Beta',
         'License :: OSI Approved :: MIT License',

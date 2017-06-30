@@ -103,6 +103,7 @@ class Routes(object):
     GUILDS_EMOJIS_CREATE = (HTTPMethod.POST, GUILDS + '/emojis')
     GUILDS_EMOJIS_MODIFY = (HTTPMethod.PATCH, GUILDS + '/emojis/{emoji}')
     GUILDS_EMOJIS_DELETE = (HTTPMethod.DELETE, GUILDS + '/emojis/{emoji}')
+    GUILDS_AUDITLOGS_LIST = (HTTPMethod.GET, GUILDS + '/audit-logs')
 
     # Users
     USERS = '/users'
@@ -201,6 +202,8 @@ class HTTPClient(LoggingClass):
         if token:
             self.headers['Authorization'] = 'Bot ' + token
 
+        self.session = requests.Session()
+
     def __call__(self, route, args=None, **kwargs):
         return self.call(route, args, **kwargs)
 
@@ -251,10 +254,12 @@ class HTTPClient(LoggingClass):
         # Possibly wait if we're rate limited
         self.limiter.check(bucket)
 
+        self.log.debug('KW: %s', kwargs)
+
         # Make the actual request
         url = self.BASE_URL + route[1].format(**args)
         self.log.info('%s %s (%s)', route[0].value, url, kwargs.get('params'))
-        r = requests.request(route[0].value, url, **kwargs)
+        r = self.session.request(route[0].value, url, **kwargs)
 
         # Update rate limiter
         self.limiter.update(bucket, r)
@@ -263,6 +268,7 @@ class HTTPClient(LoggingClass):
         if r.status_code < 400:
             return r
         elif r.status_code != 429 and 400 <= r.status_code < 500:
+            self.log.warning('Request failed with code %s: %s', r.status_code, r.content)
             raise APIException(r)
         else:
             if r.status_code == 429:
