@@ -120,7 +120,7 @@ class Player(object):
             self.events.emit(self.Events.STOP_PLAY, self.now_playing)
             self.now_playing = None
 
-            if self.queue.empty():
+            if len(self.queue) is 0:
                 self.events.emit(self.Events.EMPTY_QUEUE)
 
             if self.client.state == VoiceState.DISCONNECTED:
