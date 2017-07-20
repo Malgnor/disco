@@ -123,6 +123,7 @@ class Channel(SlottedModel, Permissible):
     position = Field(int)
     bitrate = Field(int)
     recipients = AutoDictField(User, 'id')
+    nsfw = Field(bool)
     type = Field(enum(ChannelType))
     overwrites = AutoDictField(PermissionOverwrite, 'id', alias='permission_overwrites')
 
@@ -187,7 +188,7 @@ class Channel(SlottedModel, Permissible):
         """
         Whether this channel is an NSFW channel.
         """
-        return self.type == ChannelType.GUILD_TEXT and NSFW_RE.match(self.name)
+        return self.type == ChannelType.GUILD_TEXT and (self.nsfw or NSFW_RE.match(self.name))
 
     @property
     def is_voice(self):
@@ -380,6 +381,45 @@ class Channel(SlottedModel, Permissible):
         """
         assert self.is_dm, 'Cannot close non-DM channel'
         self.delete()
+
+    def set_topic(self, topic, reason=None):
+        """
+        Sets the channels topic.
+        """
+        return self.client.api.channels_modify(self.id, topic=topic, reason=reason)
+
+    def set_name(self, name, reason=None):
+        """
+        Sets the channels name.
+        """
+        return self.client.api.channels_modify(self.id, name=name, reason=reason)
+
+    def set_position(self, position, reason=None):
+        """
+        Sets the channels position.
+        """
+        return self.client.api.channels_modify(self.id, position=position, reason=reason)
+
+    def set_nsfw(self, value, reason=None):
+        """
+        Sets whether the channel is NSFW.
+        """
+        assert (self.type == ChannelType.GUILD_TEXT)
+        return self.client.api.channels_modify(self.id, nsfw=value, reason=reason)
+
+    def set_bitrate(self, bitrate, reason=None):
+        """
+        Sets the channels bitrate.
+        """
+        assert (self.is_voice)
+        return self.client.api.channels_modify(self.id, bitrate=bitrate, reason=reason)
+
+    def set_user_limit(self, user_limit, reason=None):
+        """
+        Sets the channels user limit.
+        """
+        assert (self.is_voice)
+        return self.client.api.channels_modify(self.id, user_limit=user_limit, reason=reason)
 
 
 class MessageIterator(object):

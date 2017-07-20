@@ -16,7 +16,7 @@ extras_require = {
     'music': ['youtube_dl==2017.4.26'],
     'performance': ['erlpack==0.3.2', 'ujson==1.35'],
     'sharding': ['gipc==0.6.0'],
-    'docs': ['biblio==0.0.2'],
+    'docs': ['biblio==0.0.4'],
 }
 
 setup(
@@ -32,6 +32,8 @@ setup(
     install_requires=requirements,
     extras_require=extras_require,
     test_suite='tests',
+    setup_requires=['pytest-runner==2.11.1'],
+    tests_require=['pytest==3.1.3', 'pytest-benchmark==3.1.0a2'],
     classifiers=[
         'Development Status :: 4 - Beta',
         'License :: OSI Approved :: MIT License',
