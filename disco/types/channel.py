@@ -5,9 +5,9 @@ from six.moves import map
 from holster.enum import Enum
 
 from disco.util.snowflake import to_snowflake
-from disco.util.functional import cached_property, one_or_many, chunks
+from disco.util.functional import one_or_many, chunks
 from disco.types.user import User
-from disco.types.base import SlottedModel, Field, AutoDictField, snowflake, enum, text
+from disco.types.base import SlottedModel, Field, AutoDictField, snowflake, enum, text, cached_property
 from disco.types.permissions import Permissions, Permissible, PermissionValue
 
 
@@ -19,6 +19,7 @@ ChannelType = Enum(
     DM=1,
     GUILD_VOICE=2,
     GROUP_DM=3,
+    GUILD_CATEGORY=4,
 )
 
 PermissionOverwriteType = Enum(
@@ -126,6 +127,7 @@ class Channel(SlottedModel, Permissible):
     nsfw = Field(bool)
     type = Field(enum(ChannelType))
     overwrites = AutoDictField(PermissionOverwrite, 'id', alias='permission_overwrites')
+    parent_id = Field(snowflake)
 
     def __init__(self, *args, **kwargs):
         super(Channel, self).__init__(*args, **kwargs)
@@ -174,7 +176,7 @@ class Channel(SlottedModel, Permissible):
         """
         Whether this channel belongs to a guild.
         """
-        return self.type in (ChannelType.GUILD_TEXT, ChannelType.GUILD_VOICE)
+        return self.type in (ChannelType.GUILD_TEXT, ChannelType.GUILD_VOICE, ChannelType.GUILD_CATEGORY)
 
     @property
     def is_dm(self):
@@ -212,6 +214,13 @@ class Channel(SlottedModel, Permissible):
         Guild this channel belongs to (or None if not applicable).
         """
         return self.client.state.guilds.get(self.guild_id)
+
+    @cached_property
+    def parent(self):
+        """
+        Parent this channel belongs to (or None if not applicable).
+        """
+        return self.guild.channels.get(self.parent_id)
 
     def messages_iter(self, **kwargs):
         """
@@ -421,6 +430,16 @@ class Channel(SlottedModel, Permissible):
         assert (self.is_voice)
         return self.client.api.channels_modify(self.id, user_limit=user_limit, reason=reason)
 
+    def set_parent(self, parent, reason=None):
+        """
+        Sets the channels parent.
+        """
+        assert (self.is_guild)
+        return self.client.api.channels_modify(
+            self.id,
+            parent_id=to_snowflake(parent) if parent else parent,
+            reason=reason)
+
 
 class MessageIterator(object):
     """
@@ -466,10 +485,10 @@ class MessageIterator(object):
         Fills the internal buffer up with :class:`disco.types.message.Message` objects from the API.
         """
         self._buffer = self.client.api.channels_messages_list(
-                self.channel.id,
-                before=self.before,
-                after=self.after,
-                limit=self.chunk_size)
+            self.channel.id,
+            before=self.before,
+            after=self.after,
+            limit=self.chunk_size)
 
         if not len(self._buffer):
             return

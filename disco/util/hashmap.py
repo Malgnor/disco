@@ -1,21 +1,20 @@
 import six
 
-from six.moves import filter, map, UserDict
+from six.moves import filter, map
 from collections import defaultdict
 
 
-class HashMap(UserDict):
+class HashMap(dict):
+    __slots__ = ()
+
     def iter(self):
-        return iter(self.data)
+        return iter(self)
 
     def items(self):
-        return six.iteritems(self.data)
-
-    def keys(self):
-        return six.iterkeys(self.data)
-
-    def values(self):
-        return six.itervalues(self.data)
+        if six.PY3:
+            return super(HashMap, self).items()
+        else:
+            return super(HashMap, self).iteritems()
 
     def find(self, predicate):
         if not callable(predicate):
