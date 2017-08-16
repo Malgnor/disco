@@ -159,7 +159,7 @@ class YoutubeDLInput(FFmpegInput):
         with self._info_lock:
             if not self._info:
                 import youtube_dl
-                ydl = youtube_dl.YoutubeDL({'format': 'webm[abr>0]/bestaudio/best/worstaudio/worst', 'verbose': True})
+                ydl = youtube_dl.YoutubeDL({'format': 'webm[abr>0]/bestaudio/best/worstaudio/worst', 'quiet': True, 'ignoreerrors': True})
 
                 if self._url:
                     obj = ydl.extract_info(self._url, download=False, process=False)
@@ -179,7 +179,7 @@ class YoutubeDLInput(FFmpegInput):
     def many(cls, url, *args, **kwargs):
         import youtube_dl
 
-        ydl = youtube_dl.YoutubeDL({'format': 'webm[abr>0]/bestaudio/best/worstaudio/worst', 'verbose': True})
+        ydl = youtube_dl.YoutubeDL({'format': 'webm[abr>0]/bestaudio/best/worstaudio/worst', 'quiet': True, 'ignoreerrors': True})
         info = ydl.extract_info(url, download=False, process=False)
 
         if 'entries' not in info:
