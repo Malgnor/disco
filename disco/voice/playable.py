@@ -230,7 +230,6 @@ class UnbufferedOpusEncoderPlayable(BasePlayable, OpusEncoder, AbstractOpus):
         self.source = source
         self.info = source.info
         self.volume = 1.0
-        self.frames = Queue(kwargs.pop('queue_size', 4096))
 
         # Call the AbstractOpus constructor, as we need properties it sets
         AbstractOpus.__init__(self, *args, **kwargs)
@@ -243,6 +242,7 @@ class UnbufferedOpusEncoderPlayable(BasePlayable, OpusEncoder, AbstractOpus):
         if self.source:
             raw = self.source.read(self.frame_size)
             if len(raw) < self.frame_size:
+                self.source = None
                 return None
 
             if self.volume == 1.0:
