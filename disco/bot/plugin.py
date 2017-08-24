@@ -239,8 +239,11 @@ class Plugin(LoggingClass, PluginDeco):
                         *meta['args'],
                         **meta['kwargs'])
         elif meta['type'] == 'http.add_route':
-            meta['kwargs']['view_func'] = member
-            self.bot.http.add_url_rule(*meta['args'], **meta['kwargs'])
+            if self.bot.config.http_enabled:
+                meta['kwargs']['view_func'] = member
+                self.bot.http.add_url_rule(*meta['args'], **meta['kwargs'])
+            else:
+                self.log.warning('[%s.%s] HTTP server is disabled.', self.name, member.__name__)
         else:
             raise Exception('unhandled meta type {}'.format(meta))
 
