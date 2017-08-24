@@ -74,6 +74,8 @@ class BotConfig(Config):
         The port for the HTTP Flask server (if enabled)
     http_root_path : str
         The path to the root of the application for the HTTP Flask server (if enabled)
+    http_config : dict()
+        A dictionary containing Flask and/or custom configuration values.
     """
     levels = {}
     plugins = []
@@ -105,6 +107,7 @@ class BotConfig(Config):
     http_host = '0.0.0.0'
     http_port = 7575
     http_root_path = None
+    http_config = {}
 
 
 class Bot(LoggingClass):
@@ -152,6 +155,7 @@ class Bot(LoggingClass):
             from flask import Flask
             self.log.info('Starting HTTP server bound to %s:%s', self.config.http_host, self.config.http_port)
             self.http = Flask('disco', root_path=self.config.http_root_path)
+            self.http.config.update(self.config.http_config)
             self.http_server = WSGIServer((self.config.http_host, self.config.http_port), self.http)
             self.http_server_greenlet = gevent.spawn(self.http_server.serve_forever)
 
