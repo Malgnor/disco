@@ -195,10 +195,12 @@ class YoutubeDLInput(FFmpegInput):
 
 
 class BufferedOpusEncoderPlayable(BasePlayable, OpusEncoder, AbstractOpus):
-    def __init__(self, source, library_path=None, *args, **kwargs):
+    def __init__(self, source, *args, **kwargs):
         self.source = source
-        self.info = source.info
+        if hasattr(source, 'info'):
+            self.info = source.info
         self.frames = Queue(kwargs.pop('queue_size', 4096))
+        library_path = kwargs.pop('library_path', None)
 
         # Call the AbstractOpus constructor, as we need properties it sets
         AbstractOpus.__init__(self, *args, **kwargs)
@@ -226,16 +228,16 @@ class BufferedOpusEncoderPlayable(BasePlayable, OpusEncoder, AbstractOpus):
 
 
 class UnbufferedOpusEncoderPlayable(BasePlayable, OpusEncoder, AbstractOpus):
-    def __init__(self, source, library_path=None, *args, **kwargs):
+    def __init__(self, source, *args, **kwargs):
         self.source = source
-        self.info = source.info
+        if hasattr(source, 'info'):
+            self.info = source.info
         self.volume = 1.0
 
-        # Call the AbstractOpus constructor, as we need properties it sets
+        library_path = kwargs.pop('library_path', None)
+
         AbstractOpus.__init__(self, *args, **kwargs)
 
-        # Then call the OpusEncoder constructor, which requires some properties
-        #  that AbstractOpus sets up
         OpusEncoder.__init__(self, self.sampling_rate, self.channels, library_path=library_path)
 
     def next_frame(self):
