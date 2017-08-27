@@ -17,6 +17,7 @@ class Player(object):
         'PAUSE_PLAY',
         'RESUME_PLAY',
         'EMPTY_QUEUE',
+        'FIRST_FRAME',
         'DISCONNECT'
     )
 
@@ -77,6 +78,8 @@ class Player(object):
 
         start = time.time()
         loops = 0
+
+        self.events.emit(self.Events.FIRST_FRAME)
 
         while True:
             loops += 1
