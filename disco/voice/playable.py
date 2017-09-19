@@ -159,7 +159,7 @@ class YoutubeDLInput(FFmpegInput):
         with self._info_lock:
             if not self._info:
                 import youtube_dl
-                ydl = youtube_dl.YoutubeDL({'format': 'webm[abr>0]/bestaudio/best/worstaudio/worst', 'quiet': True, 'ignoreerrors': True, 'no_warnings': True})
+                ydl = youtube_dl.YoutubeDL({'format': 'webm[abr>0]/bestaudio/best/worstaudio/worst', 'quiet': True, 'no_warnings': True})
 
                 if self._url:
                     obj = ydl.extract_info(self._url, download=False, process=False)
@@ -179,7 +179,7 @@ class YoutubeDLInput(FFmpegInput):
     def many(cls, url, *args, **kwargs):
         import youtube_dl
 
-        ydl = youtube_dl.YoutubeDL({'format': 'webm[abr>0]/bestaudio/best/worstaudio/worst', 'quiet': True, 'ignoreerrors': True, 'no_warnings': True})
+        ydl = youtube_dl.YoutubeDL({'format': 'webm[abr>0]/bestaudio/best/worstaudio/worst', 'quiet': True, 'no_warnings': True})
         info = ydl.extract_info(url, download=False, process=False)
 
         if 'entries' not in info:
@@ -240,11 +240,12 @@ class UnbufferedOpusEncoderPlayable(BasePlayable, OpusEncoder, AbstractOpus):
 
         OpusEncoder.__init__(self, self.sampling_rate, self.channels, library_path=library_path)
 
+        self.source.read(0)
+
     def next_frame(self):
         if self.source:
             raw = self.source.read(self.frame_size)
             if len(raw) < self.frame_size:
-                self.source = None
                 return None
 
             if self.volume == 1.0:
@@ -254,7 +255,6 @@ class UnbufferedOpusEncoderPlayable(BasePlayable, OpusEncoder, AbstractOpus):
             for pos, byte in enumerate(buffer):
                 buffer[pos] = int(min(32767, max(-32767, byte*self.volume)))
             return self.encode(buffer.tobytes(), self.samples_per_frame)
-        self.source = None
         return None
 
 
