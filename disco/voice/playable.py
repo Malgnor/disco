@@ -1,5 +1,4 @@
 import abc
-import array
 import six
 import types
 import gevent
@@ -28,7 +27,7 @@ class AbstractOpus(object):
     def __init__(self, sampling_rate=48000, frame_length=20, channels=2):
         self.sampling_rate = sampling_rate
         self.frame_length = frame_length
-        self.channels = 2
+        self.channels = channels
         self.sample_size = 2 * self.channels
         self.samples_per_frame = int(self.sampling_rate / 1000 * self.frame_length)
         self.frame_size = self.samples_per_frame * self.sample_size
@@ -225,37 +224,6 @@ class BufferedOpusEncoderPlayable(BasePlayable, OpusEncoder, AbstractOpus):
 
     def next_frame(self):
         return self.frames.get()
-
-
-class UnbufferedOpusEncoderPlayable(BasePlayable, OpusEncoder, AbstractOpus):
-    def __init__(self, source, *args, **kwargs):
-        self.source = source
-        if hasattr(source, 'info'):
-            self.info = source.info
-        self.volume = 1.0
-
-        library_path = kwargs.pop('library_path', None)
-
-        AbstractOpus.__init__(self, *args, **kwargs)
-
-        OpusEncoder.__init__(self, self.sampling_rate, self.channels, library_path=library_path)
-
-        self.source.read(0)
-
-    def next_frame(self):
-        if self.source:
-            raw = self.source.read(self.frame_size)
-            if len(raw) < self.frame_size:
-                return None
-
-            if self.volume == 1.0:
-                return self.encode(raw, self.samples_per_frame)
-
-            buffer = array.array('h', raw)
-            for pos, byte in enumerate(buffer):
-                buffer[pos] = int(min(32767, max(-32767, byte*self.volume)))
-            return self.encode(buffer.tobytes(), self.samples_per_frame)
-        return None
 
 
 class DCADOpusEncoderPlayable(BasePlayable, AbstractOpus, OpusEncoder):
