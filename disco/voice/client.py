@@ -290,7 +290,7 @@ class VoiceClient(LoggingClass):
             self.heartbeat_task.kill()
             self.heartbeat_task = None
 
-        if self.ws and self.ws.sock.connected:
+        if self.ws and self.ws.sock and self.ws.sock.connected:
             self.ws.close()
 
         if self.udp and self.udp.connected:
