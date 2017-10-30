@@ -8,7 +8,7 @@ from holster.enum import Enum
 
 from disco.types.base import (
     SlottedModel, Field, ListField, AutoDictField, snowflake, text,
-    datetime, enum, cached_property
+    datetime, enum, cached_property,
 )
 from disco.util.paginator import Paginator
 from disco.util.snowflake import to_snowflake
@@ -43,7 +43,7 @@ class Emoji(SlottedModel):
 
     @cached_property
     def custom(self):
-        return self.id is not None
+        return bool(self.id)
 
     def __eq__(self, other):
         if isinstance(other, Emoji):

@@ -18,7 +18,7 @@ class Player(object):
         'RESUME_PLAY',
         'EMPTY_QUEUE',
         'FIRST_FRAME',
-        'DISCONNECT'
+        'DISCONNECT',
     )
 
     def __init__(self, client, queue=None):
