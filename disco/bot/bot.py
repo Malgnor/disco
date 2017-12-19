@@ -80,6 +80,7 @@ class BotConfig(Config):
     levels = {}
     plugins = []
     plugin_config = {}
+    shared_config = {}
 
     commands_enabled = True
     commands_require_mention = True
@@ -511,6 +512,9 @@ class Bot(LoggingClass):
             self.config.plugin_config_dir, name) + '.' + self.config.plugin_config_format
 
         data = {}
+        if self.config.shared_config:
+            data.update(self.config.shared)
+
         if name in self.config.plugin_config:
             data.update(self.config.plugin_config[name])
 

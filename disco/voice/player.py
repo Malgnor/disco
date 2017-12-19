@@ -46,7 +46,7 @@ class Player(object):
         self.complete = gevent.event.Event()
 
         # Event emitter for metadata
-        self.events = Emitter(spawn_each=True)
+        self.events = Emitter()
 
     def disconnect(self):
         self.client.disconnect()
